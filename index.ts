@@ -20,11 +20,14 @@ const stream = t.stream('statuses/filter', { track: `@${appName}` });
     args: ['--no-sandbox', '--disable-setuid-sandbox', '--incognito']
   });
 
-  stream.on('tweet', tweet => replyMention(tweet, browser));
+  stream.on('tweet', tweet => getDirections(tweet, browser));
   stream.on('error', console.log);
 })();
 
-async function replyMention(tweet: TweetObj, browser: puppeteer.Browser) {
+async function getDirections(tweet: TweetObj, browser: puppeteer.Browser) {
+  let destination = getDestinationFromTweet(tweet.text);
+  if (!destination) return;
+
   let page = await browser.newPage();
   page.setRequestInterception(true);
   page.on('request', optimizeRequests);
@@ -33,22 +36,33 @@ async function replyMention(tweet: TweetObj, browser: puppeteer.Browser) {
     let selector = 'input#chatinput';
     await page.goto('https://lara.ng/');
     await page.waitForSelector(selector);
-    await page.type(selector, 'from ilupeju to somolu');
+    await page.type(selector, destination);
     await page.waitFor(500);
     await page.type(selector, String.fromCharCode(13));
 
-    let directions = await getDirections(page);
-    let [parsedDirections, going] = parseDirections(directions);
+    let response = await page.waitForResponse(fromLara);
+    let [parsedDirections, going] = parseDirections(await response.json());
 
     await sendDirectionsToDM(parsedDirections, tweet.user.id_str);
     await replyTweet(tweet, going);
-
-    await page.waitFor(500);
-    await page.close();
   } catch (error) {
     console.log('error', error);
+  } finally {
     await page.close();
   }
+}
+
+function fromLara(response: puppeteer.Response) {
+  return (
+    response.url().includes('https://convers-e.com/rp/laraqtx?Query') &&
+    response.status() === 200 &&
+    parseInt(response.headers()['content-length'], 10) > 0
+  );
+}
+
+function getDestinationFromTweet(tweetText: string) {
+  let matches = tweetText.match(/(from .+ to .+)/gi);
+  return matches ? matches[0].toLowerCase() : null;
 }
 
 function optimizeRequests(request: puppeteer.Request) {
@@ -57,7 +71,6 @@ function optimizeRequests(request: puppeteer.Request) {
     ? request.abort()
     : request.continue();
 }
-
 
 function parseDirections(directions: any): string[] {
   let routes: any[] = directions[1].Legs[0];
@@ -87,15 +100,15 @@ function parseDirections(directions: any): string[] {
   return [directions[0] + '\n' + parsedDirection, directions[0]];
 }
 
-async function getDirections(page: puppeteer.Page) {
-  let response = await page.waitForResponse(
-    response =>
-      response.url().includes('https://convers-e.com/rp/laraqtx?Query') &&
-      response.status() === 200 &&
-      parseInt(response.headers()['content-length'], 10) > 0
-  );
-  return response.json();
-}
+// async function getDirections(page: puppeteer.Page) {
+//   let response = await page.waitForResponse(
+//     response =>
+//       response.url().includes('https://convers-e.com/rp/laraqtx?Query') &&
+//       response.status() === 200 &&
+//       parseInt(response.headers()['content-length'], 10) > 0
+//   );
+//   return response.json();
+// }
 
 async function sendDirectionsToDM(directions: string, recipient_id: string) {
   return t.post('direct_messages/events/new', {
