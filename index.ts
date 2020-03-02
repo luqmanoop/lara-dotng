@@ -1,14 +1,118 @@
 import puppeteer from 'puppeteer';
+import Twit from 'twit';
+import 'dotenv/config';
+import { TweetObj } from './interface';
+
+const t = new Twit({
+  consumer_key: process.env.CONSUMER_KEY,
+  consumer_secret: process.env.CONSUMER_SECRET,
+  access_token: process.env.ACCESS_TOKEN,
+  access_token_secret: process.env.ACCESS_TOKEN_SECRET,
+  timeout_ms: 60 * 1000,
+  strictSSL: true
+});
+
+const appName = process.env.APP_NAME;
+const stream = t.stream('statuses/filter', { track: `@${appName}` });
 
 (async () => {
   const browser = await puppeteer.launch({
-    headless: false,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--incognito']
   });
 
-  let page = await browser.newPage();
-  await page.goto('https://example.com');
-  await page.waitFor(4000)
-  await browser.close()
-
+  stream.on('tweet', tweet => replyMention(tweet, browser));
+  stream.on('error', console.log);
 })();
+
+async function replyMention(tweet: TweetObj, browser: puppeteer.Browser) {
+  let page = await browser.newPage();
+  page.setRequestInterception(true);
+  page.on('request', optimizeRequests);
+
+  try {
+    let selector = 'input#chatinput';
+    await page.goto('https://lara.ng/');
+    await page.waitForSelector(selector);
+    await page.type(selector, 'from ilupeju to somolu');
+    await page.waitFor(500);
+    await page.type(selector, String.fromCharCode(13));
+
+    let directions = await getDirections(page);
+    let [parsedDirections, going] = parseDirections(directions);
+
+    await sendDirectionsToDM(parsedDirections, tweet.user.id_str);
+    await replyTweet(tweet, going);
+
+    await page.waitFor(500);
+    await page.close();
+  } catch (error) {
+    console.log('error', error);
+    await page.close();
+  }
+}
+
+function optimizeRequests(request: puppeteer.Request) {
+  let expensiveResources = ['image', 'stylesheet', 'font'];
+  return expensiveResources.includes(request.resourceType())
+    ? request.abort()
+    : request.continue();
+}
+
+
+function parseDirections(directions: any): string[] {
+  let routes: any[] = directions[1].Legs[0];
+  let parsedDirection = routes
+    .map((route: any) => {
+      if (route.Vehicle && route.Vehicle.Type !== 'Walk') {
+        let {
+          Vehicle: { Type, MinFare },
+          HeadSign,
+          Start,
+          End
+        } = route;
+        return `\nTake a ${Type}\nFrom: ${Start.Name}\nHeading Toward: ${End.Name}\nGet off at: ${HeadSign}\nPrice: ₦${MinFare}\n`;
+      } else {
+        if (!route.Info) return `\nWalk to ${route.End.Name}\n`;
+
+        let info = route.Info;
+        return `\nWalk to your destination\nTotal Estimate: ₦${
+          info.MinFare
+        } - ${
+          info.MaxFare
+        }\n\nEstimated Travel Time: ${info.TravelTime.trim()}`;
+      }
+    })
+    .join('');
+
+  return [directions[0] + '\n' + parsedDirection, directions[0]];
+}
+
+async function getDirections(page: puppeteer.Page) {
+  let response = await page.waitForResponse(
+    response =>
+      response.url().includes('https://convers-e.com/rp/laraqtx?Query') &&
+      response.status() === 200 &&
+      parseInt(response.headers()['content-length'], 10) > 0
+  );
+  return response.json();
+}
+
+async function sendDirectionsToDM(directions: string, recipient_id: string) {
+  return t.post('direct_messages/events/new', {
+    event: {
+      type: 'message_create',
+      message_create: {
+        target: { recipient_id },
+        message_data: { text: directions }
+      }
+    }
+  } as any);
+}
+
+function replyTweet(tweet: TweetObj, going: string) {
+  return t.post('statuses/update', {
+    in_reply_to_status_id: tweet.id_str,
+    auto_populate_reply_metadata: true,
+    status: `Please CYDM for ${going}`
+  } as any);
+}
