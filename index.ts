@@ -41,10 +41,12 @@ async function getDirections(tweet: TweetObj, browser: puppeteer.Browser) {
     await page.type(selector, String.fromCharCode(13));
 
     let response = await page.waitForResponse(fromLara);
-    let [parsedDirections, going] = parseDirections(await response.json());
+    let directions = parseDirections(await response.json());
 
-    await sendDirectionsToDM(parsedDirections, tweet.user.id_str);
-    await replyTweet(tweet, going);
+    if (typeof directions === 'string') return replyTweet(tweet, directions);
+
+    await sendDirectionsToDM(directions[0], tweet.user.id_str);
+    await replyTweet(tweet, `Please CYDM for ${directions[1]}`);
   } catch (error) {
     console.log('error', error);
   } finally {
@@ -73,6 +75,8 @@ function optimizeRequests(request: puppeteer.Request) {
 }
 
 function parseDirections(directions: any): string[] {
+  if (typeof directions !== 'object') return directions;
+
   let routes: any[] = directions[1].Legs[0];
   let parsedDirection = routes
     .map((route: any) => {
@@ -100,16 +104,6 @@ function parseDirections(directions: any): string[] {
   return [directions[0] + '\n' + parsedDirection, directions[0]];
 }
 
-// async function getDirections(page: puppeteer.Page) {
-//   let response = await page.waitForResponse(
-//     response =>
-//       response.url().includes('https://convers-e.com/rp/laraqtx?Query') &&
-//       response.status() === 200 &&
-//       parseInt(response.headers()['content-length'], 10) > 0
-//   );
-//   return response.json();
-// }
-
 async function sendDirectionsToDM(directions: string, recipient_id: string) {
   return t.post('direct_messages/events/new', {
     event: {
@@ -122,10 +116,10 @@ async function sendDirectionsToDM(directions: string, recipient_id: string) {
   } as any);
 }
 
-function replyTweet(tweet: TweetObj, going: string) {
+function replyTweet(tweet: TweetObj, status: string) {
   return t.post('statuses/update', {
     in_reply_to_status_id: tweet.id_str,
     auto_populate_reply_metadata: true,
-    status: `Please CYDM for ${going}`
+    status
   } as any);
 }
