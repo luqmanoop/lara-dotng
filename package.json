@@ -1,7 +1,7 @@
 {
   "name": "lara-dotng",
   "version": "1.0.0",
-  "description": "",
+  "description": "Twitter Bot for the awesome Public Transit Directions Assistant - https://lara.ng",
   "main": "dist/index.js",
   "scripts": {
     "build": "parcel build index.ts --target node --no-cache",
@@ -15,8 +15,17 @@
     "type": "git",
     "url": "git+https://github.com/codeshifu/lara-dotng.git"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "lara.ng",
+    "lara",
+    "twitter bot",
+    "lara on twitter",
+    "get directions",
+    "public transit directions",
+    "lagos",
+    "abuja"
+  ],
+  "author": "Luqman Olushi <olushilukmon03@gmail.com> (https://github.com/codeshifu)",
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/codeshifu/lara-dotng/issues"
