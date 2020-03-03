@@ -25,6 +25,8 @@ const stream = t.stream('statuses/filter', { track: `@${appName}` });
 })();
 
 async function getDirections(tweet: TweetObj, browser: puppeteer.Browser) {
+  if (tweet.in_reply_to_screen_name === tweet.user.screen_name) return;
+  
   let destination = getDestinationFromTweet(tweet.text);
   if (!destination) return;
 
