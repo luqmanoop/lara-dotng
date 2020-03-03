@@ -9,7 +9,7 @@ I've been using lara.ng for a little over 2years but recently followed them on T
 That was when it struck me! _There are millions of Nigerians on [Twitter](https://twitter.com), why not make this accessible to them_. Afterall, Lara claims to be a (chat) bot.
 
 ## Challenge
-If you didn't know already, there is no public API to interface with lara.ng
+If you didn't know already, there is no public API to interface with lara.ng. To have access, you need to submit a request to hello@lara.ng. Never tried that before so I can't say how easy/painful the process is.
 
 ## Solution
 **No API? No Problem!** [Puppeteer](https://developers.google.com/web/tools/puppeteer) to the rescue!
